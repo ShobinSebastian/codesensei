@@ -414,13 +414,16 @@ if __name__ == "__main__":
     # Test the analyzer with sample code
     
     test_code = """
-def get_user(user_id):
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    return execute_query(query)
-
-x = 10
-y = 20
-print(x)
+  def divide_numbers(a, b):
+result = a / b
+return result
+def get_user_by_id(user_id):
+query = f"SELECT * FROM users WHERE id = {user_id}"
+return execute_query(query)
+numbers = [1, 2, 3, 4, 5]
+total = 0
+for i in range(len(numbers) + 1):
+total += numbers[i]
 """
     
     analyzer = StaticAnalyzer()
