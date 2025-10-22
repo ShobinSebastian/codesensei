@@ -6,4 +6,4 @@ def calculate():
     result = x + y
     return result
 
-unused_var = 100
+unused_var = 100 

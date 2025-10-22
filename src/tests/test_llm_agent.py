@@ -30,7 +30,7 @@ class TestLLMAgent:
         """Test: Agent initializes correctly"""
         assert self.agent is not None
         assert self.agent.client is not None
-        assert self.agent.model == "mixtral-8x7b-32768"
+        assert self.agent.model == "llama-3.3-70b-versatile"
     
     def test_analyzes_simple_code(self):
         """Test: Can analyze simple code without errors"""
@@ -61,7 +61,7 @@ result = divide(10, 0)
         
         # Check if any issue mentions division or zero
         messages = ' '.join([
-            str(issue.get('message', '')) + ' ' + 
+            str(issue.get('message', '')) + ' ' +  
             str(issue.get('explanation', ''))
             for issue in issues
         ]).lower()

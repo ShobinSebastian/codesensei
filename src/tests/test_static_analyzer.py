@@ -45,7 +45,7 @@ def get_user(user_id):
         ]
         assert len(security_issues) > 0
     
-    def test_handles_valid_code(self):
+    def test_handles_valid_code(self): 
         clean_code = """
 def add_numbers(a, b):
     return a + b
