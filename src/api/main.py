@@ -1,14 +1,15 @@
-# src/api/main.py - UPDATED with Code Explainer
+# src/api/main.py
 
 """
-CodeSensei API - Updated with Code Explainer
-=============================================
-FastAPI backend with code analysis + explanation features.
+CodeSensei API - Complete Feature Set
+======================================
+FastAPI backend with code analysis, explanation, and debugging.
 
-New Endpoints (Day 8-10):
-- POST /explain - Explain code (basic/medium/detailed)
-- POST /explain/concepts - Extract key concepts
-- POST /explain/complexity - Analyze complexity
+Version: 0.3.0
+Features:
+- Analysis (Day 1-7): /analyze, /analyze/static
+- Explainer (Day 8-10): /explain, /explain/concepts, /explain/complexity
+- Debugger (Day 11-14): /debug, /debug/quick, /debug/fix
 
 Author: Shobin Sebastian
 Date: November 2025
@@ -20,10 +21,12 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 import os
 from dotenv import load_dotenv
+
 from src.core.orchestrator import CodeAnalysisOrchestrator
 from src.analyzers.static_analyzer import StaticAnalyzer
 from src.agents.llm_agent import LLMAgent
 from src.features.code_explainer import CodeExplainer
+from src.features.bug_debugger import BugDebugger
 
 # Load environment variables
 load_dotenv()
@@ -31,8 +34,8 @@ load_dotenv()
 # Initialize FastAPI
 app = FastAPI(
     title="CodeSensei API",
-    description="AI-powered code review, analysis, and explanation system",
-    version="0.2.0",
+    description="AI-powered code review, analysis, explanation, and debugging system",
+    version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -51,14 +54,15 @@ orchestrator = None
 static_analyzer = None
 llm_agent = None
 code_explainer = None
+bug_debugger = None
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize all services on startup."""
-    global orchestrator, static_analyzer, llm_agent, code_explainer
+    global orchestrator, static_analyzer, llm_agent, code_explainer, bug_debugger
     
-    print("🚀 Starting CodeSensei API v0.2.0...")
+    print("🚀 Starting CodeSensei API v0.3.0...")
     
     try:
         # Core services
@@ -72,11 +76,13 @@ async def startup_event():
         try:
             llm_agent = LLMAgent()
             code_explainer = CodeExplainer(llm_agent)
+            bug_debugger = BugDebugger(static_analyzer, llm_agent)
             print("  ✓ LLM services initialized")
         except Exception as e:
             print(f"  ⚠ LLM services unavailable: {e}")
             llm_agent = None
             code_explainer = None
+            bug_debugger = None
         
         print("✅ API ready!")
         
@@ -105,7 +111,7 @@ class CodeExplainRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "code": "def factorial(n):\n    return 1 if n <= 1 else n * factorial(n-1)",
                 "detail_level": "medium"
@@ -116,6 +122,20 @@ class CodeExplainRequest(BaseModel):
 class ConceptsRequest(BaseModel):
     """Request for concept extraction."""
     code: str = Field(..., description="Python code to analyze")
+
+
+class DebugRequest(BaseModel):
+    """Request model for debugging."""
+    code: str = Field(..., description="Buggy Python code", min_length=1)
+    error_message: Optional[str] = Field(None, description="Optional runtime error message")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "code": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)",
+                "error_message": "ZeroDivisionError: division by zero"
+            }
+        }
 
 
 class ExplainResponse(BaseModel):
@@ -130,21 +150,20 @@ class ExplainResponse(BaseModel):
 
 
 # ============================================================================
-# ORIGINAL ENDPOINTS (from Day 1-7)
+# MAIN ENDPOINTS
 # ============================================================================
 
 @app.get("/")
 async def root():
     """Welcome endpoint with API info."""
     return {
-        "message": "Welcome to CodeSensei API v0.2.0",
-        "version": "0.2.0",
+        "message": "Welcome to CodeSensei API v0.3.0",
+        "version": "0.3.0",
         "status": "running",
         "features": {
             "code_analysis": "Analyze code for bugs and issues",
-            "code_explanation": "Explain code in simple terms (NEW!)",
-            "concept_extraction": "Identify programming concepts (NEW!)",
-            "complexity_analysis": "Measure code complexity (NEW!)"
+            "code_explanation": "Explain code in simple terms",
+            "bug_debugging": "Debug and fix bugs step-by-step"
         },
         "docs": "/docs"
     }
@@ -155,15 +174,20 @@ async def health():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "services": {
             "static_analyzer": static_analyzer is not None,
             "llm_agent": llm_agent is not None,
             "orchestrator": orchestrator is not None,
-            "code_explainer": code_explainer is not None
+            "code_explainer": code_explainer is not None,
+            "bug_debugger": bug_debugger is not None
         }
     }
 
+
+# ============================================================================
+# ANALYSIS ENDPOINTS (Day 1-7)
+# ============================================================================
 
 @app.post("/analyze")
 async def analyze_code(request: CodeAnalysisRequest):
@@ -213,7 +237,7 @@ async def analyze_static_only(request: CodeAnalysisRequest):
 
 
 # ============================================================================
-# NEW ENDPOINTS (Day 8-10: Code Explainer)
+# EXPLAINER ENDPOINTS (Day 8-10)
 # ============================================================================
 
 @app.post("/explain", response_model=ExplainResponse)
@@ -221,24 +245,13 @@ async def explain_code(request: CodeExplainRequest):
     """
     Explain code in beginner-friendly language.
     
-    New endpoint for Day 8-10 feature!
-    
     Detail levels:
     - basic: One-sentence summary
     - medium: Overview + key concepts
     - detailed: Full explanation + line-by-line + learning path
-    
-    Args:
-        request: Code and detail level
-        
-    Returns:
-        Comprehensive explanation with concepts and learning path
     """
     if not code_explainer:
-        raise HTTPException(
-            503,
-            "Code explainer not available. Check GROQ_API_KEY."
-        )
+        raise HTTPException(503, "Code explainer not available. Check GROQ_API_KEY.")
     
     try:
         result = code_explainer.explain(
@@ -262,17 +275,7 @@ async def explain_code(request: CodeExplainRequest):
 
 @app.post("/explain/concepts")
 async def extract_concepts(request: ConceptsRequest):
-    """
-    Extract programming concepts from code.
-    
-    Identifies what concepts are being used (loops, functions, etc.)
-    
-    Args:
-        request: Code to analyze
-        
-    Returns:
-        List of concepts with descriptions
-    """
+    """Extract programming concepts from code."""
     if not code_explainer:
         raise HTTPException(503, "Code explainer not available")
     
@@ -291,17 +294,7 @@ async def extract_concepts(request: ConceptsRequest):
 
 @app.post("/explain/complexity")
 async def analyze_complexity(request: ConceptsRequest):
-    """
-    Analyze code complexity.
-    
-    Returns complexity metrics and interpretation.
-    
-    Args:
-        request: Code to analyze
-        
-    Returns:
-        Complexity metrics with human-readable interpretation
-    """
+    """Analyze code complexity."""
     if not code_explainer:
         raise HTTPException(503, "Code explainer not available")
     
@@ -319,17 +312,7 @@ async def analyze_complexity(request: ConceptsRequest):
 
 @app.post("/explain/quick")
 async def quick_explain(request: ConceptsRequest):
-    """
-    Quick one-sentence explanation.
-    
-    Fastest endpoint - just tells you what the code does.
-    
-    Args:
-        request: Code to explain
-        
-    Returns:
-        One-sentence explanation
-    """
+    """Quick one-sentence explanation."""
     if not llm_agent:
         raise HTTPException(503, "LLM service not available")
     
@@ -347,7 +330,118 @@ async def quick_explain(request: ConceptsRequest):
 
 
 # ============================================================================
-# HELPER ENDPOINTS
+# DEBUGGER ENDPOINTS (Day 11-14)
+# ============================================================================
+
+@app.post("/debug")
+async def debug_code(request: DebugRequest):
+    """
+    Debug code and get comprehensive fix guidance.
+    
+    Provides:
+    - List of bugs found
+    - Root cause analysis
+    - Step-by-step fix instructions
+    - Fixed code example
+    - Prevention tips
+    - Test suggestions
+    """
+    if not bug_debugger:
+        raise HTTPException(503, "Bug debugger not available. Check GROQ_API_KEY.")
+    
+    try:
+        result = bug_debugger.debug(
+            code=request.code,
+            error_message=request.error_message
+        )
+        
+        return {
+            "success": True,
+            **result
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Debugging failed: {str(e)}")
+
+
+@app.post("/debug/quick")
+async def quick_debug(request: DebugRequest):
+    """Quick bug detection (no detailed analysis)."""
+    if not bug_debugger:
+        raise HTTPException(503, "Bug debugger not available")
+    
+    try:
+        bugs = bug_debugger._detect_bugs(request.code, request.error_message)
+        
+        return {
+            "success": True,
+            "bugs_found": bugs,
+            "count": len(bugs)
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Bug detection failed: {str(e)}")
+
+
+@app.post("/debug/fix")
+async def get_fix(request: DebugRequest):
+    """Get fixed version of buggy code."""
+    if not bug_debugger:
+        raise HTTPException(503, "Bug debugger not available")
+    
+    try:
+        bugs = bug_debugger._detect_bugs(request.code, request.error_message)
+        
+        if not bugs:
+            return {
+                "success": True,
+                "message": "No bugs detected",
+                "fixed_code": request.code
+            }
+        
+        fixed_code = bug_debugger._generate_fixed_code(request.code, bugs)
+        
+        return {
+            "success": True,
+            "bugs_fixed": len(bugs),
+            "original_code": request.code,
+            "fixed_code": fixed_code
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Fix generation failed: {str(e)}")
+
+
+@app.post("/debug/prevention")
+async def get_prevention_tips(request: DebugRequest):
+    """Get prevention tips for bugs in code."""
+    if not bug_debugger:
+        raise HTTPException(503, "Bug debugger not available")
+    
+    try:
+        bugs = bug_debugger._detect_bugs(request.code, request.error_message)
+        
+        if not bugs:
+            return {
+                "success": True,
+                "message": "No bugs detected",
+                "tips": []
+            }
+        
+        tips = bug_debugger._generate_prevention_tips(bugs)
+        
+        return {
+            "success": True,
+            "bugs_analyzed": len(bugs),
+            "prevention_tips": tips
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Prevention analysis failed: {str(e)}")
+
+
+# ============================================================================
+# UTILITY ENDPOINTS
 # ============================================================================
 
 @app.get("/features")
@@ -363,6 +457,12 @@ async def list_features():
             "concepts": "POST /explain/concepts - Extract concepts",
             "complexity": "POST /explain/complexity - Analyze complexity",
             "quick": "POST /explain/quick - One-sentence explanation"
+        },
+        "debugging": {
+            "debug": "POST /debug - Full debugging report",
+            "quick": "POST /debug/quick - Quick bug detection",
+            "fix": "POST /debug/fix - Get fixed code",
+            "prevention": "POST /debug/prevention - Prevention tips"
         },
         "utility": {
             "health": "GET /health - Service health check",
