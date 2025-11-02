@@ -1,0 +1,2 @@
+[console_scripts]
+codesensei = src.cli.cli:cli

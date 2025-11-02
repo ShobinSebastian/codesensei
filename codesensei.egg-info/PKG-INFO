@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: codesensei
+Version: 0.3.0
+Summary: AI-powered code analysis, explanation, and debugging tool
+Home-page: https://github.com/yourusername/codesensei
+Author: Shobin Sebastian
+Author-email: your.email@example.com
+Keywords: code-analysis debugging ai llm static-analysis
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi==0.104.1
+Requires-Dist: uvicorn[standard]==0.24.0
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: groq==0.4.1
+Requires-Dist: pylint==3.0.3
+Requires-Dist: bandit==1.7.5
+Requires-Dist: radon==6.0.1
+Requires-Dist: python-dotenv==1.0.0
+Requires-Dist: pytest==7.4.3
+Requires-Dist: click==8.1.7
+Requires-Dist: rich==13.7.0
+Requires-Dist: httpx==0.25.2
+Requires-Dist: requests==2.31.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+CodeSensei - AI-Powered Code Analysis Tool
