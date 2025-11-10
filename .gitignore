@@ -1,36 +1,59 @@
-# Virtual Environment
-venv/
-env/
-
+# .gitignore - Files to exclude from Git
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment variables
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment Variables
 .env
 .env.local
+.env.*.local
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
-temp/
-cache/
+# Temporary files
+*.tmp
+*.bak
+test_*.py
+fixed_*.py
+debug_report.json
+analysis_results.json
