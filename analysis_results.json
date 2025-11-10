@@ -1,0 +1,31 @@
+{
+  "issues": [],
+  "summary": {
+    "total": 0,
+    "by_severity": {
+      "critical": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "by_category": {
+      "bug": 0,
+      "security": 0,
+      "logic": 0,
+      "performance": 0,
+      "style": 0
+    },
+    "by_tool": {
+      "static": 0,
+      "llm": 0,
+      "enhanced": 0
+    }
+  },
+  "metadata": {
+    "execution_time": 0.7,
+    "static_issues": 0,
+    "llm_issues": 0,
+    "total_unique_issues": 0,
+    "llm_used": false,
+    "code_lines": 9
+  }
+}
