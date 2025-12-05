@@ -27,3 +27,6 @@ rich==13.7.0
 # Optional (for development)
 httpx==0.25.2  # For testing FastAPI
 requests==2.31.0  # For API testing
+
+# Add to existing requirements.txt
+prometheus-client==0.19.0

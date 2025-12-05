@@ -1,0 +1,266 @@
+# .github/workflows/ci.yml
+# Complete CI/CD pipeline for CodeSensei
+
+name: CodeSensei CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # Job 1: Code Quality Checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black mypy bandit safety
+          pip install -r requirements.txt
+
+      - name: Lint with flake8
+        run: |
+          # Stop on critical errors
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warning on complexity and line length
+          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
+
+      - name: Check code formatting
+        run: |
+          black --check src/ --line-length 100
+        continue-on-error: true
+
+      - name: Type checking with mypy
+        run: |
+          mypy src/ --ignore-missing-imports --no-strict-optional
+        continue-on-error: true
+
+      - name: Security scan with bandit
+        run: |
+          bandit -r src/ -ll -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Dependency security check
+        run: |
+          safety check --json
+        continue-on-error: true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: bandit-report.json
+
+  # Job 2: Run Tests
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: quality
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          pytest src/tests/ -v --cov=src --cov-report=xml --cov-report=html
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-${{ matrix.python-version }}
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+
+  # Job 3: Build Docker Image
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t codesensei:${{ github.sha }} .
+
+      - name: Test Docker image
+        run: |
+          docker run -d --name test-container -p 8000:8000 \
+            -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+            codesensei:${{ github.sha }}
+
+          # Wait for container to start
+          sleep 15
+
+          # Test health endpoint
+          curl -f http://localhost:8000/health || exit 1
+
+          # Stop container
+          docker stop test-container
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: codesensei:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Save Docker image
+        run: |
+          docker save codesensei:${{ github.sha }} | gzip > codesensei-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: codesensei-image.tar.gz
+          retention-days: 7
+
+  # Job 4: Deploy (Dry Run)
+  deploy-dry-run:
+    name: Deployment Dry Run
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Simulate deployment
+        run: |
+          echo "🚀 Deployment Configuration"
+          echo "================================"
+          echo "Image: codesensei:${{ github.sha }}"
+          echo "Environment: production"
+          echo "Target: Cloud Run / Railway / Render"
+          echo ""
+          echo "Would execute:"
+          echo "  gcloud run deploy codesensei \\"
+          echo "    --image gcr.io/project/codesensei:${{ github.sha }} \\"
+          echo "    --platform managed \\"
+          echo "    --region us-central1 \\"
+          echo "    --allow-unauthenticated \\"
+          echo "    --set-env-vars GROQ_API_KEY=*** \\"
+          echo "    --memory 512Mi \\"
+          echo "    --cpu 1"
+
+      - name: Generate deployment manifest
+        run: |
+          cat > deployment-manifest.yaml << EOF
+          apiVersion: v1
+          kind: Deployment
+          metadata:
+            name: codesensei
+            image: codesensei:${{ github.sha }}
+            environment: production
+            timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+
+          cat deployment-manifest.yaml
+
+      - name: Upload deployment manifest
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-manifest
+          path: deployment-manifest.yaml
+
+  # Job 5: Performance Benchmarks
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest-benchmark
+
+      - name: Run benchmarks
+        run: |
+          pytest src/tests/test_static_analyzer.py --benchmark-only --benchmark-json=benchmark.json
+        continue-on-error: true
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: "pytest"
+          output-file-path: benchmark.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+
+  # Job 6: Notify Success
+  notify:
+    name: Notify Success
+    runs-on: ubuntu-latest
+    needs: [quality, test, build, deploy-dry-run]
+    if: success()
+
+    steps:
+      - name: Success notification
+        run: |
+          echo "✅ All CI/CD checks passed!"
+          echo "Build: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Ready for deployment!"

@@ -10,7 +10,6 @@ Why use LLM for code review?
 - Finds logical errors static tools miss
 - Provides educational feedback
  
-Author: Shobin Sebastian
 """
 
 import os
@@ -25,8 +24,6 @@ load_dotenv()
 class LLMAgent:
     """
     An AI agent that reviews code using Large Language Models.
-    
-    LLM = Large Language Model (like ChatGPT, Claude, Mixtral)
     These models can understand and reason about code like a human.
     """
     

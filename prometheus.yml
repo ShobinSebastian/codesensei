@@ -1,0 +1,39 @@
+# prometheus.yml
+# Prometheus configuration for CodeSensei monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: "codesensei-local"
+    environment: "production"
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Scrape configurations
+scrape_configs:
+  # CodeSensei API metrics
+  - job_name: "codesensei-api"
+    static_configs:
+      - targets: ["codesensei-api:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Node exporter (system metrics)
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+# Recording rules
+rule_files:
+  # - 'alerts.yml'
